@@ -1,0 +1,4 @@
+config/
+credentials/
+node_modules/
+token/

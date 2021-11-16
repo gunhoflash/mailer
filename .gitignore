@@ -2,3 +2,5 @@ config/
 credentials/
 node_modules/
 token/
+
+whitelist.json

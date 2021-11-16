@@ -1,5 +1,5 @@
 import readline from 'readline';
-import { getOAuth2Client } from './src/mailer';
+import { getOAuth2Client } from './mailer';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -26,4 +26,3 @@ const prompt = () => {
 };
 
 prompt();
-

@@ -16,11 +16,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // CORS
-if (whitelist?.length) {
+if (whitelist.length) {
   console.log('Use whitelist:', whitelist);
   app.use(cors({
     origin: function (origin, callback) {
-      if (origin && whitelist.indexOf(origin) !== -1) {
+      if (origin && (whitelist as string[]).indexOf(origin) !== -1) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

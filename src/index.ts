@@ -2,6 +2,7 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import Mailer from './mailer';
@@ -19,13 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 if (whitelist.length) {
   console.log('Use whitelist:', whitelist);
   app.use(cors({
-    origin: function (origin, callback) {
-      if (origin && (whitelist as string[]).indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    }
+    origin: whitelist as string[],
   }));
 } else {
   console.log('Whitelist not found, allow all origin.');
@@ -35,10 +30,16 @@ if (whitelist.length) {
 app.post('/send-mail', (req, res) => {
   const { account, from, to, subject, message, contentType } = req.body;
 
+  if (!account || !from || !to || !subject || !message || !contentType) {
+    return res.status(400).send('Invalid body');
+  }
+
   if (!mailers.has(account)) mailers.set(account, new Mailer(account));
 
   const nMailSent = mailers.get(account)!.sendMail({ from, to, subject, message, contentType });
-  res.send(nMailSent);
+  res.json({
+    result: nMailSent,
+  });
 });
 
 app.get('/mail-queue/:account', (req, res) => {
@@ -71,6 +72,9 @@ app.get('/failed-mail/:account', (req, res) => {
 
 const HTTP_PORT = process.env.HTTP_PORT;
 const HTTPS_PORT = process.env.HTTPS_PORT;
+const SSL_CA = process.env.SSL_CA;
+const SSL_KEY = process.env.SSL_KEY;
+const SSL_CERT = process.env.SSL_CERT;
 
 if (!HTTP_PORT && !HTTPS_PORT) {
   console.error('HTTP_PORT or HTTPS_PORT are required');
@@ -83,13 +87,16 @@ if (HTTP_PORT) {
   });
 }
 
-if (HTTPS_PORT) {
+if (HTTPS_PORT && SSL_CA && SSL_KEY && SSL_CERT) {
   const options = {
-    key: process.env.SSL_KEY,
-    cert: process.env.SSL_CERT,
+    ca: fs.readFileSync(SSL_CA),
+    key: fs.readFileSync(SSL_KEY),
+    cert: fs.readFileSync(SSL_CERT),
+    requestCert: false,
+    rejectUnauthorized: false
   };
 
   https.createServer(options, app).listen(HTTPS_PORT, () => {
-    console.log(`https server listen: ${HTTPS_PORT} with options: ${JSON.stringify(options)}`);
+    console.log(`https server listen: ${HTTPS_PORT}`);
   });
 }

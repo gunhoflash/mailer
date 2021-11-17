@@ -150,7 +150,7 @@ export default class Mailer {
           raw: base64Encode(
             `From: ${from}\n` +
             `To: ${to}\n` +
-            `Subject: ${subject}\n` +
+            `Subject: =?utf-8?B?${base64Encode(subject)}?=\n` +
             'MIME-Version: 1.0\n' +
             `Content-Type: ${contentType}; charset="UTF-8"\n` + // text/plain, text/html
             'Content-Transfer-Encoding: message/rfc2822\n' + // 7bit, quoted-printable

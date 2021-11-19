@@ -26,9 +26,10 @@ else {
     console.log('Whitelist not found, allow all origin.');
     app.use((0, cors_1.default)());
 }
+const checkSecret = (account, secret) => account && secret && (secret === process.env[`secret_${account}`]);
 app.post('/send-mail', (req, res) => {
-    const { account, from, to, subject, message, contentType } = req.body;
-    if (!account || !from || !to || !subject || !message || !contentType) {
+    const { account, from, to, subject, message, contentType, secret } = req.body;
+    if (!checkSecret(account, secret) || !from || !to || !subject || !message || !contentType) {
         return res.status(400).send('Invalid body');
     }
     if (!mailers.has(account))
@@ -38,10 +39,11 @@ app.post('/send-mail', (req, res) => {
         result: nMailSent,
     });
 });
-app.get('/mail-queue/:account', (req, res) => {
+app.post('/mail-queue/:account', (req, res) => {
     const { account } = req.params;
-    if (!account) {
-        return res.status(400).send('Account is required');
+    const { secret } = req.body;
+    if (!checkSecret(account, secret)) {
+        return res.status(400).send('Invalid body');
     }
     if (!mailers.has(account))
         mailers.set(account, new mailer_1.default(account));
@@ -49,10 +51,11 @@ app.get('/mail-queue/:account', (req, res) => {
         result: mailers.get(account).getMailQueue(),
     });
 });
-app.get('/failed-mail/:account', (req, res) => {
+app.post('/failed-mail/:account', (req, res) => {
     const { account } = req.params;
-    if (!account) {
-        return res.status(400).send('Account is required');
+    const { secret } = req.body;
+    if (!checkSecret(account, secret)) {
+        return res.status(400).send('Invalid body');
     }
     if (!mailers.has(account))
         mailers.set(account, new mailer_1.default(account));

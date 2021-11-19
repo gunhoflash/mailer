@@ -5,6 +5,7 @@ import express from 'express';
 import fs from 'fs';
 import http from 'http';
 import https from 'https';
+import morgan from 'morgan';
 import Mailer from './mailer';
 import whitelist from '../whitelist.json';
 
@@ -15,6 +16,7 @@ const mailers = new Map<string, Mailer>();
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(morgan('combined'));
 
 // CORS
 if (whitelist.length) {

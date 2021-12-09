@@ -1,10 +1,11 @@
 /* eslint-disable no-undef */
-import { readFile, writeFile } from 'fs/promises';
+import { constants } from 'fs';
+import { access, mkdir, readFile, writeFile } from 'fs/promises';
 import readline from 'readline';
 import { gmail_v1, google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 
-type Credentials = {
+type CredentialFileContent = {
   installed: {
     client_id: string;
     project_id: string;
@@ -23,11 +24,14 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
 ];
 
+const tokenDirectoryName = 'token';
+const getTokenPath = (tokenName: string) => `${tokenDirectoryName}/token.${tokenName}.json`;
+
 const base64Encode = (message: string) => Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 
 export const getOAuth2Client = async (credentialsName: string, tokenName: string, noTokenInitialize = false) => {
   const credentialsPath = `credentials/credentials.${credentialsName}.json`;
-  const tokenPath = `token/token.${tokenName}.json`;
+  const tokenPath = getTokenPath(tokenName);
 
   try {
     // Load client secrets from a local file.
@@ -42,15 +46,15 @@ export const getOAuth2Client = async (credentialsName: string, tokenName: string
 };
 
 // Create an OAuth2 client with the given credentials
-const authorize = async (credentials: Credentials, tokenPath: string, noTokenInitialize = false) => {
+const authorize = async (credentials: CredentialFileContent, tokenPath: string, noTokenInitialize = false) => {
   const { client_secret, client_id, redirect_uris } = credentials.installed;
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  let token;
 
   try {
     // Check if we have previously stored a token.
-    const token: any = await readFile(tokenPath);
-    oAuth2Client.setCredentials(JSON.parse(token));
-    return oAuth2Client;
+    token = JSON.parse(await readFile(tokenPath) as any);
+    oAuth2Client.setCredentials(token);
   } catch (e) {
     // Token file not found
     if (noTokenInitialize) {
@@ -58,6 +62,20 @@ const authorize = async (credentials: Credentials, tokenPath: string, noTokenIni
     }
     return await getNewToken(oAuth2Client, tokenPath);
   }
+
+  if (token.expiry_date < Date.now() + 60000) {
+    try {
+      // If the token is expired or about to expire, get a new one.
+      const accessTokenResponse = await oAuth2Client.getAccessToken();
+      token = accessTokenResponse.res?.data;
+    } catch (e) {
+      throw e;
+    }
+    oAuth2Client.setCredentials(token);
+    writeTokenFile(tokenPath, token);
+  }
+
+  return oAuth2Client;
 };
 
 // Get and store new token after prompting for user authorization
@@ -90,17 +108,31 @@ const getNewToken = (oAuth2Client: OAuth2Client, tokenPath: string) => new Promi
       oAuth2Client.setCredentials(token);
 
       // Store the token to disk for later program executions
-      try {
-        await writeFile(tokenPath, JSON.stringify(token));
-        console.log('Token stored to', tokenPath);
-        return resolve(oAuth2Client);
-      } catch (e) {
-        console.error(e);
-        return reject();
-      }
+      writeTokenFile(tokenPath, token);
+      return resolve(oAuth2Client);
     });
   });
 });
+
+const writeTokenFile = async (tokenPath: string, token: any) => {
+  // check if the directory exists
+  const dir = `${tokenDirectoryName}`;
+
+  try {
+    try {
+      await access(dir, constants.F_OK);
+    } catch (e) {
+      // if the directory doesn't exist, create it
+      await mkdir(dir);
+    }
+
+    // write the token to the file
+    await writeFile(tokenPath, JSON.stringify(token));
+    console.log('Token stored to', tokenPath);
+  } catch (e) {
+    console.log(e);
+  }
+};
 
 export interface Mail {
   from: string;

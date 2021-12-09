@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getOAuth2Client = void 0;
+const fs_1 = require("fs");
 const promises_1 = require("fs/promises");
 const readline_1 = __importDefault(require("readline"));
 const googleapis_1 = require("googleapis");
@@ -11,10 +12,12 @@ const SCOPES = [
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/gmail.send',
 ];
+const tokenDirectoryName = 'token';
+const getTokenPath = (tokenName) => `${tokenDirectoryName}/token.${tokenName}.json`;
 const base64Encode = (message) => Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 const getOAuth2Client = async (credentialsName, tokenName, noTokenInitialize = false) => {
     const credentialsPath = `credentials/credentials.${credentialsName}.json`;
-    const tokenPath = `token/token.${tokenName}.json`;
+    const tokenPath = getTokenPath(tokenName);
     try {
         const content = await (0, promises_1.readFile)(credentialsPath);
         return await authorize(JSON.parse(content), tokenPath, noTokenInitialize);
@@ -28,10 +31,10 @@ exports.getOAuth2Client = getOAuth2Client;
 const authorize = async (credentials, tokenPath, noTokenInitialize = false) => {
     const { client_secret, client_id, redirect_uris } = credentials.installed;
     const oAuth2Client = new googleapis_1.google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+    let token;
     try {
-        const token = await (0, promises_1.readFile)(tokenPath);
-        oAuth2Client.setCredentials(JSON.parse(token));
-        return oAuth2Client;
+        token = JSON.parse(await (0, promises_1.readFile)(tokenPath));
+        oAuth2Client.setCredentials(token);
     }
     catch (e) {
         if (noTokenInitialize) {
@@ -39,6 +42,18 @@ const authorize = async (credentials, tokenPath, noTokenInitialize = false) => {
         }
         return await getNewToken(oAuth2Client, tokenPath);
     }
+    if (token.expiry_date < Date.now() + 60000) {
+        try {
+            const accessTokenResponse = await oAuth2Client.getAccessToken();
+            token = accessTokenResponse.res?.data;
+        }
+        catch (e) {
+            throw e;
+        }
+        oAuth2Client.setCredentials(token);
+        writeTokenFile(tokenPath, token);
+    }
+    return oAuth2Client;
 };
 const getNewToken = (oAuth2Client, tokenPath) => new Promise((resolve, reject) => {
     const authUrl = oAuth2Client.generateAuthUrl({
@@ -62,18 +77,27 @@ const getNewToken = (oAuth2Client, tokenPath) => new Promise((resolve, reject) =
                 return reject();
             }
             oAuth2Client.setCredentials(token);
-            try {
-                await (0, promises_1.writeFile)(tokenPath, JSON.stringify(token));
-                console.log('Token stored to', tokenPath);
-                return resolve(oAuth2Client);
-            }
-            catch (e) {
-                console.error(e);
-                return reject();
-            }
+            writeTokenFile(tokenPath, token);
+            return resolve(oAuth2Client);
         });
     });
 });
+const writeTokenFile = async (tokenPath, token) => {
+    const dir = `${tokenDirectoryName}`;
+    try {
+        try {
+            await (0, promises_1.access)(dir, fs_1.constants.F_OK);
+        }
+        catch (e) {
+            await (0, promises_1.mkdir)(dir);
+        }
+        await (0, promises_1.writeFile)(tokenPath, JSON.stringify(token));
+        console.log('Token stored to', tokenPath);
+    }
+    catch (e) {
+        console.log(e);
+    }
+};
 class Mailer {
     #gmail = null;
     #account;

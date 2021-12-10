@@ -31,22 +31,34 @@ if (whitelist.length) {
 
 const checkSecret = (account: any, secret: any) => account && secret && (secret === process.env[`secret_${account}`]);
 
-app.post('/send-mail', (req, res) => {
+const getMailer = async (account: string) => {
+  let mailer = mailers.get(account);
+
+  if (!mailer) {
+    mailer = new Mailer(account);
+    mailers.set(account, mailer);
+    await mailer.initClient();
+  }
+
+  return mailer;
+}
+
+app.post('/send-mail', async (req, res) => {
   const { account, from, to, subject, message, contentType, secret } = req.body;
 
   if (!checkSecret(account, secret) || !from || !to || !subject || !message || !contentType) {
     return res.status(400).send('Invalid body');
   }
 
-  if (!mailers.has(account)) mailers.set(account, new Mailer(account));
+  const mailer = await getMailer(account);
 
-  const nMailSent = mailers.get(account)!.sendMail({ from, to, subject, message, contentType });
+  const nMailSent = await mailer.sendMail({ from, to, subject, message, contentType });
   res.json({
     result: nMailSent,
   });
 });
 
-app.post('/mail-queue/:account', (req, res) => {
+app.post('/mail-queue/:account', async (req, res) => {
   const { account } = req.params;
   const { secret } = req.body;
 
@@ -54,14 +66,14 @@ app.post('/mail-queue/:account', (req, res) => {
     return res.status(400).send('Invalid body');
   }
 
-  if (!mailers.has(account)) mailers.set(account, new Mailer(account));
+  const mailer = await getMailer(account);
 
   res.json({
-    result: mailers.get(account)!.getMailQueue(),
+    result: mailer.getMailQueue(),
   });
 });
 
-app.post('/failed-mail/:account', (req, res) => {
+app.post('/failed-mail/:account', async (req, res) => {
   const { account } = req.params;
   const { secret } = req.body;
 
@@ -69,10 +81,10 @@ app.post('/failed-mail/:account', (req, res) => {
     return res.status(400).send('Invalid body');
   }
 
-  if (!mailers.has(account)) mailers.set(account, new Mailer(account));
+  const mailer = await getMailer(account);
 
   res.json({
-    result: mailers.get(account)!.getFailedMails(),
+    result: mailer.getFailedMails(),
   });
 });
 

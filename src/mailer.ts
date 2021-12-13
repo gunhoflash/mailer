@@ -26,7 +26,7 @@ const SCOPES = [
 
 const tokenDirectoryName = 'token';
 const getTokenPath = (tokenName: string) => `${tokenDirectoryName}/token.${tokenName}.json`;
-const base64Encode = (message: string) => Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+const base64Encode = (message: string) => Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 export const refreshToken = async (oAuth2Client: OAuth2Client, tokenName: string) => {
   if (oAuth2Client.credentials.expiry_date! > Date.now() + 10000) {
@@ -206,10 +206,9 @@ export default class Mailer {
             raw: base64Encode(
               `From: ${from}\n` +
               `To: ${to}\n` +
-              `Subject: =?utf-8?B?${base64Encode(subject)}?=\n` +
+              `Subject: =?utf-8?B?${Buffer.from(subject).toString('base64')}?=\n` +
               'MIME-Version: 1.0\n' +
-              `Content-Type: ${contentType}; charset="UTF-8"\n` + // text/plain, text/html
-              'Content-Transfer-Encoding: message/rfc2822\n' + // 7bit, quoted-printable
+              `Content-Type: ${contentType}; charset=utf-8\n` + // text/plain, text/html
               '\n' +
               `${message}\n`
             ),

@@ -9,7 +9,6 @@ const promises_1 = require("fs/promises");
 const readline_1 = __importDefault(require("readline"));
 const googleapis_1 = require("googleapis");
 const SCOPES = [
-    'https://mail.google.com/',
     'https://www.googleapis.com/auth/gmail.send',
 ];
 const tokenDirectoryName = 'token';
@@ -24,9 +23,11 @@ const refreshToken = async (oAuth2Client, tokenName) => {
         const prev_access_token = oAuth2Client.credentials.access_token;
         const { token, res } = await oAuth2Client.getAccessToken();
         if (token) {
+            console.log('Got a new token.');
             oAuth2Client.credentials.access_token = token;
         }
         else if (res?.data) {
+            console.log('No token returned.');
             oAuth2Client.setCredentials(res.data);
         }
         if (oAuth2Client.credentials.access_token !== prev_access_token) {
@@ -36,7 +37,7 @@ const refreshToken = async (oAuth2Client, tokenName) => {
         }
     }
     catch (e) {
-        console.error('Error on refreshToken()', e);
+        console.error('Error on refreshToken:', e);
     }
     return false;
 };

@@ -20,7 +20,6 @@ type CredentialFileContent = {
 // To check all scopes: https://developers.google.com/identity/protocols/oauth2/scopes?hl=en
 // If modifying these scopes, delete the token file.
 const SCOPES = [
-  'https://mail.google.com/',
   'https://www.googleapis.com/auth/gmail.send',
 ];
 
@@ -39,8 +38,10 @@ export const refreshToken = async (oAuth2Client: OAuth2Client, tokenName: string
     const prev_access_token = oAuth2Client.credentials.access_token;
     const { token, res } = await oAuth2Client.getAccessToken();
     if (token) {
+      console.log('Got a new token.');
       oAuth2Client.credentials.access_token = token;
     } else if (res?.data) {
+      console.log('No token returned.');
       oAuth2Client.setCredentials(res.data);
     }
     if (oAuth2Client.credentials.access_token !== prev_access_token) {
@@ -49,7 +50,7 @@ export const refreshToken = async (oAuth2Client: OAuth2Client, tokenName: string
       return true;
     }
   } catch (e) {
-    console.error('Error on refreshToken()', e);
+    console.error('Error on refreshToken:', e);
   }
   return false;
 };
